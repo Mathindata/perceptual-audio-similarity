@@ -6,6 +6,38 @@ ABX phone-discrimination benchmark.
 
 **Full writeup: [`report/REPORT.md`](report/REPORT.md)**
 
+## Results at a glance
+
+| Metric | ABX accuracy | Pearson r (vs. human) | Pseudo-R² (probit) |
+|---|---|---|---|
+| Log-mel | 0.671 | 0.267 | 0.013 |
+| **MFCC** | **0.772** | **0.356** | **0.016** |
+| wav2vec2 (L6) | 0.748 | 0.272 | 0.012 |
+| WavLM (L6) | 0.901 | 0.599 | 0.039 |
+| **HuBERT (L6)** | **0.906** | **0.602** | **0.043** |
+| MFCC + HuBERT, weighted combo | 0.916 | 0.622 | 0.047 |
+
+wav2vec2 never beats the simple signal-level MFCC baseline; HuBERT and WavLM decisively do,
+roughly tripling the probit pseudo-R². The two best metrics also fail on systematically
+different, linguistically interpretable classes of phonetic contrast (see below and the full
+report) — MFCC on coarse manner-of-articulation confusions (nasal vs. fricative, stop vs.
+fricative), HuBERT on fine within-manner contrasts (voicing, place of sibilants).
+
+### Embedding space, by phonetic manner class
+
+![MFCC vs HuBERT embedding space, colored by manner of articulation](report/figures/embedding_space_manner.png)
+
+MFCC (left) and HuBERT layer 6 (right), both projected to 2D via PCA → t-SNE from the same raw
+audio, colored by manner of articulation (vowel, stop, fricative, nasal, liquid/glide,
+affricate).
+
+### Embedding space, for the specific contrasts found by listening
+
+![MFCC vs HuBERT embedding space, colored by individual phone for the listening-test contrast set](report/figures/embedding_space_contrasts.png)
+
+Just the phones involved in the head-to-head listening comparison: sibilants (s/z/ʃ) that
+fooled HuBERT, and manner contrasts (k/ŋ/f/v) that fooled MFCC.
+
 ## Setup
 
 ```bash
