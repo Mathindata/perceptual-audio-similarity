@@ -1,0 +1,156 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portfolio Projects: Master Handoff</title>
+<style>
+:root { --ink:#1a1a1a; --muted:#5c5c5c; --rule:#e2e2e2; --accent:#2b5797; --code-bg:#f4f4f6; }
+*{box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:var(--ink);line-height:1.6;max-width:840px;margin:0 auto;padding:44px 26px 90px;font-size:16.5px;}
+h1{font-size:27px;margin:0 0 8px;}
+h2{font-size:20px;margin:36px 0 10px;padding-top:16px;border-top:2px solid var(--rule);}
+h3{font-size:16.5px;margin:20px 0 6px;}
+p{margin:10px 0;} a{color:var(--accent);}
+code{background:var(--code-bg);padding:2px 6px;border-radius:4px;font-family:"SF Mono","Menlo","Consolas",monospace;font-size:13.5px;}
+pre{background:var(--code-bg);padding:14px 16px;border-radius:8px;overflow-x:auto;border:1px solid var(--rule);}
+pre code{background:none;padding:0;}
+hr{border:none;border-top:1px solid var(--rule);margin:30px 0;}
+ul,ol{padding-left:22px;} li{margin:5px 0;} strong{font-weight:600;}
+@media (max-width:600px){body{font-size:15.5px;padding:26px 16px 60px;}h1{font-size:22px;}}
+@media print{body{max-width:none;font-size:11pt;padding:0;}h2{page-break-after:avoid;}}
+</style></head><body>
+<h1>Portfolio Projects: Master Handoff</h1>
+<p>A single note to resume this work in a fresh session. It covers the audio-similarity project in
+detail (that is the active build), then the state of the other projects, and the file names for
+each so nothing has to be reconstructed.</p>
+<p>These are portfolio pieces built against a Generative AI Data Scientist / Researcher job posting.
+The through-line across all of them: honest evaluation, catching the trap most people miss, and
+reporting what is real rather than what flatters.</p>
+<hr />
+<h2>ACTIVE PROJECT: Perceptual vs Signal-Level Audio Similarity (Problem 3)</h2>
+<h3>The question</h3>
+<p>Does ranking audio similarity by perceptual (learned-embedding, task-based) metrics agree with
+human perceptual judgment better than signal-level (spectral, L2) metrics? This is the measured
+version of the thesis behind Matin's old perceptual-loss speech compression work.</p>
+<h3>The chosen first axis: phonetic content (Perceptimatic)</h3>
+<p>An ABX phone-discrimination benchmark. Each triplet is three short triphones: A and X share the
+center phone, B differs. Humans picked whether A or B sounds more like X. The dataset ships the
+per-listener human results, so the human ground truth is already collected. This axis was chosen
+because the ground truth is real human perception and it suits Matin's speech background.</p>
+<h3>The core methodological guard (do not lose this)</h3>
+<p>Ground truth must be independent of the metrics under test. If you define similarity by an
+attribute label and test an embedding of that same attribute, the metric wins by construction
+and the result is meaningless. Perceptimatic avoids this: the human judgments are holistic
+phone-discrimination choices, not the label of any single metric. Keep every claim tied to which
+ground truth produced it.</p>
+<h3>DATA MODULE: DONE and verified</h3>
+<p>The full data chain is built and tested against real metadata. Chain:
+<code>triplet (TGT_item, OTH_item, X_item)</code> -&gt; <code>alignment row (index -&gt; #file, onset, offset, #phone,
+speaker)</code> -&gt; <code>wav on disk &lt;ZRC_ROOT&gt;/english/1s/&lt;#file&gt;.wav</code> -&gt; <code>cut [onset, offset]</code> at 16 kHz mono.</p>
+<p>Resolved facts (all confirmed with the real files):
+- Dataset: <strong>zrc2017 test set</strong>, English (NOT abxLS, NOT zr2015, NOT the Task 2 dataset — all
+  three were wrong turns). Downloaded via the ZeroSpeech toolbox: <code>zrc datasets:pull
+  zrc2017-test-dataset</code>.
+- Filenames are the <code>#file</code> number directly: <code>7180.wav</code>. Essentially all referenced stimuli live
+  in the <code>english/1s/</code> subfolder (26,338 files; <code>10s</code> has 4,053, <code>120s</code> has 261). Each referenced
+  <code>#file</code> resolves to exactly one path, so first-match search is correct.
+- English filter is the <strong><code>EN</code> id prefix</strong> on the triplet <code>filename</code>, NOT "items resolve against
+  the English alignment" (that let in 46 French triplets with no human score). Correct result:
+  <strong>2,214 English triplets, every one with a real human score</strong>, 983 distinct wavs.
+- Human score column is <strong><code>H</code></strong> in <code>human_and_models.csv</code> (per-listener; the loader averages to a
+  mean human delta per triplet). Confirm the column name in your copy before trusting it.
+- The dataset ALSO ships <code>MFCC</code> and <code>DP</code> baseline delta columns — use these to sanity-check your
+  own MFCC implementation.</p>
+<p>Loader file: <strong><code>perceptimatic_loader.py</code></strong>. To run for real: place it beside the three CSVs, set
+<code>ZRC_ROOT</code> to the <code>zrc2017-test-dataset</code> folder, <code>pip install soundfile</code>, call
+<code>build_triplets(with_audio=True)</code>. It returns a list of dicts:
+<code>{triplet_id, A/B/X: {file, onset, offset, phone, speaker, wav}, human}</code>.
+Roles: A = TGT (same center phone as X), B = OTH (different), X = reference.</p>
+<h3>NEXT STEP: the metrics layer (not yet built)</h3>
+<p>Build these behind ONE uniform interface so signal and perceptual metrics are interchangeable:</p>
+<pre><code>distance(clip_a, clip_b) -&gt; float     # lower = more similar
+</code></pre>
+<ul>
+<li>Signal-level (baseline): MFCC distance via DTW; log-mel spectral distance. (Check MFCC against
+  the shipped <code>MFCC</code> column.)</li>
+<li>Perceptual (Matin's DNN side): DTW distance over wav2vec2 / HuBERT / WavLM frame features;
+  optionally Whisper encoder features. CLAP/MERT are a poor fit for fine phonetic contrasts, so
+  leave them out of this axis.</li>
+</ul>
+<h3>THEN: the evaluation</h3>
+<p>For each metric and each triplet compute <code>delta = d(B,X) - d(A,X)</code>.
+- ABX accuracy: fraction of triplets where <code>delta</code> has the correct sign.
+- Human agreement (the real target): how well <code>delta</code> predicts the human <code>H</code>, following
+  Perceptimatic's method (a probit regression of human responses on the model's delta). This asks
+  "does the metric fail where humans fail," which is stronger than raw accuracy.
+Report per metric; the honest possible outcome is that signal-level does fine on some axis, which
+would partly refute the thesis. Report it straight.</p>
+<h3>Design doc and diagram</h3>
+<p>Full system design: <strong><code>audio_sim_design.md</code></strong> / <code>.html</code>, with architecture diagram
+<code>audio_sim_design.png</code>. Note: that design was written before the axis was fixed to Perceptimatic;
+the per-section splitting it describes is not needed here (stimuli are already short triphones),
+and the metric set narrows to speech-representation models as above.</p>
+<h3>File inventory for this project</h3>
+<ul>
+<li><code>perceptimatic_loader.py</code> — the working data module (DONE).</li>
+<li><code>all_triplets.csv</code> (tab-separated; <code>filename</code> is the triplet id, <code>EN</code>/<code>FR</code> prefixed).</li>
+<li><code>all_aligned_clean_english.csv</code> (tab-separated; <code>index -&gt; #file, onset, offset, #phone, speaker</code>).</li>
+<li><code>human_and_models.csv</code> (comma-separated; per-listener rows, <code>H</code> human column, plus <code>MFCC</code>/<code>DP</code>
+  baselines).</li>
+<li><code>needed_zrc2017_wavs_english.csv</code> — the 983-file list actually referenced.</li>
+<li><code>audio_sim_design.md</code> / <code>.html</code> / <code>audio_sim_design.png</code> — design and diagram.</li>
+</ul>
+<h3>Future axes (after phonetic content works)</h3>
+<p>Same harness, swap the ground truth: VoxSim (speaker identity, ~70k human ratings on VoxCeleb),
+CDPAM (audio quality/artifact triplets). Running across axes is what turns one number into a
+finding — signal-level may win on one axis and lose badly on another.</p>
+<hr />
+<h2>PROJECT STATE: the others</h2>
+<h3>1. LLM fine-tuning + coding agent (worked on heavily; a real result in hand)</h3>
+<p>Fine-tuned Qwen2.5-Coder-3B (QLoRA/Unsloth, OpenHands trajectory data) to act as a coding agent,
+built the agent loop, and diagnosed it rigorously. <strong>Key finding: the partial fine-tune (~1.1 of 3
+epochs, GPU quota ran out) made the model WORSE than the base model</strong> — base produced a usable
+action 80% of the time and the correct fix first try; the adapter managed 20% and rambled. This
+is an honest, quantified before/after, a stronger portfolio story than a fine-tune that happened
+to work.
+- Open: finish training to 2-3 epochs and rerun the base-vs-adapter comparison to see if the
+  adapter recovers (needs GPU). Then Phases 4 (evaluation) and 5 (verifier: raw vs verified pass
+  rate).
+- Files: <code>phase1_data_prep.ipynb</code>, <code>phase2_finetune.ipynb</code>, <code>phase3_agent_loop.ipynb</code>,
+  <code>agent_core.py</code> (the tested ReAct loop; parser handles the OpenHands action format),
+  <code>coding_agent_handoff.md</code>/<code>.html</code>, <code>coding_agent_interview_prep.md</code>/<code>.html</code>,
+  <code>finetune_diagnostic_report.md</code>/<code>.html</code> (the regression finding, written up clean).</p>
+<h3>2. Vector search / retrieval (this is the umbrella the audio project sits under)</h3>
+<p>The audio-similarity project IS the concrete vector-search build. The broader menu (semantic
+search done rigorously, dense vs sparse vs hybrid, a chunking study, ANN index tradeoffs) remains
+available if a second retrieval piece is wanted later.</p>
+<h3>3. ANP flood-forecasting research note (substantially done; arXiv-style draft exists)</h3>
+<p>Grew from "write up the flood result" into a real experiment: Attentive Neural Process attention-
+as-kernel study on Bow River flow. <strong>Finding: the simplest explicit kernel (Laplace attention)
+beats learned multi-head attention</strong> (test NSE 0.89 vs 0.85), a matching-inductive-bias-to-problem
+result. All attention types underestimate the flood peak (honest limitation, quantified).
+- Open: verify the <code>[VERIFY]</code>-tagged citations before posting; add per-year error bars (only 5
+  test years); regenerate the hydrograph from a full-length run.
+- Files: <code>anp_bow_arxiv.pdf</code> / <code>.tex</code> (compiled 6-page draft), <code>anp_bow_experiments.ipynb</code> (runs
+  on <code>bow_merged.csv</code>), figures <code>fig*.png</code>, <code>flood_note_outline_v2.md</code>/<code>.html</code> (the reframed
+  scaffold around the faithfulness question, which is a SEPARATE future study — the GP-ARD
+  faithfulness test was scoped but never run).</p>
+<h3>Cross-project notes</h3>
+<ul>
+<li>Compute reality: fine-tuning and the ANP full runs are GPU-bound and kept hitting free-Colab
+  quota limits. The audio metrics layer is the low-compute path (pretrained inference + CPU
+  scoring).</li>
+<li>Writing style for any drafted output: no em dashes, plain words, Matin's own voice, don't
+  overuse "I"; never invent citation details — leave a field blank and flag it.</li>
+</ul>
+<hr />
+<h2>Resume checklist for the audio project</h2>
+<ul>
+<li>[ ] Point <code>perceptimatic_loader.py</code> at the real <code>zrc2017-test-dataset</code>, <code>pip install soundfile</code>,
+      confirm <code>build_triplets(with_audio=True)</code> cuts audio (2,214 triplets).</li>
+<li>[ ] Build the metrics layer behind <code>distance(a, b)</code>: MFCC-DTW first (check vs shipped <code>MFCC</code>
+      column), then a wav2vec2/HuBERT feature-DTW metric.</li>
+<li>[ ] Build evaluation: per-triplet <code>delta = d(B,X) - d(A,X)</code>; ABX sign-accuracy and probit fit to
+      human <code>H</code>; per-metric table.</li>
+<li>[ ] Report honestly, ground-truth caveat attached.</li>
+<li>[ ] Later: add VoxSim (speaker) and CDPAM (quality) axes on the same harness.</li>
+</ul>
+</body></html>

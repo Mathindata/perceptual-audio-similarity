@@ -1,0 +1,39 @@
+# Raw datasets -- far too large for git, and not yours to redistribute anyway.
+# Anyone cloning this repo should download them fresh via the ZeroSpeech toolbox
+# (see README for the exact `zrc datasets:pull` commands).
+*.zip
+zrc2017-test-dataset/
+zrc2017-train-dataset/
+zrc2017-tde-random/
+abxLS.datasets/
+abxLS-dataset.htm
+
+# The three source CSVs ship with the ZeroSpeech dataset itself -- re-derived,
+# not authored here. Keep them out unless you specifically want the repo to
+# be self-contained without a fresh download.
+all_triplets.csv
+all_aligned_clean_english.csv
+all_aligned_clean_french.csv
+human_and_models*.csv
+needed_zrc2017_wavs_english.csv
+
+# Generated outputs -- reproducible by rerunning the scripts, not source material.
+metric_cache/
+listen_clips/
+listen_clips_*/
+
+# Loose PNGs anywhere are throwaway/reproducible -- but NOT report/figures/,
+# which holds the actual result plots referenced by the report (see README
+# for the suggested layout). If you keep everything flat instead, move
+# embedding_space_manner.png and embedding_space_contrasts.png out of this
+# rule manually, e.g. with `git add -f`.
+*.png
+!report/figures/*.png
+
+# Python
+__pycache__/
+*.pyc
+
+# Accidental download duplicates
+*(1).*
+*.crdownload
